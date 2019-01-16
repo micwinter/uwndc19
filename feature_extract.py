@@ -14,7 +14,7 @@ import os
 model = models.vgg16(pretrained = True)
 
 # Use the model object to select the desired layer
-layer = model._modules.get('avgpool')
+layer = model._modules.get('features')
 
 # Set model to evaluation mode
 model.eval()
@@ -44,10 +44,14 @@ def get_vector(image_name):
     # 8. Return the feature vector
     return my_embedding
 
+data_dir = '/Users/minter/Documents/all'
+data = np.load(os.path.join(data_dir, 'stim.npy'))
+
 for stim_im in enumerate(data.shape[0]):
     stim_vec = get_vector(data[stim_im,:,:,:])
+    np.save(str(stim_im)+'features.npy', stim_vec)
 
-data_dir = '/Users/minter/Documents/all'
+
 
 
 
