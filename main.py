@@ -83,7 +83,7 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
             elif method == 'ridge':
                 # import ipdb; ipdb.set_trace()
                 clf = Ridge(alpha)
-                clf.fit(features[layer][split[0]+50], target[split[0]])
+                clf.fit(features[layer][split[0]], target[split[0]])
                 preds = clf.predict(features[layer][split[1]])
                 r2_score = clf.score(features[layer][split[1]], target[split[1]])
                 rmse_score = rmse(target[split[1]], preds)
@@ -113,7 +113,7 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
 
 
 if __name__ == '__main__':
-    data_root = '/Users/minter/Dropbox/uwndc19_data/'
+    data_root = '/home/jlg/michele/data/uwndc19'#'/Users/minter/Dropbox/uwndc19_data/'
     get_features(load_data(data_root))
     # predict(data_root, 'alexnet_features.npy', 'linear', subset=True)
     # alphas = [1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3]
