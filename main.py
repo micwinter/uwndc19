@@ -29,8 +29,8 @@ def load_data(data_root):
 
 def get_features(data):
     # Load network
-    # model = models.alexnet(pretrained=True)
-    model = models.vgg16(pretrained=True)
+    model = models.alexnet(pretrained=True)
+    # model = models.vgg16(pretrained=True)
 
     # Run data through network
     ext_feat = {}
@@ -40,7 +40,7 @@ def get_features(data):
         features = features
         ext_feat[layer] = features.detach().numpy()
         print('layer ', layer, ' of ', len(model.features), ' complete')
-    save_name = 'vgg16_features.npy'
+    save_name = 'alexnet_features.npy'
     print('Saving file...')
     np.save(os.path.join(data_root, save_name), ext_feat)
 
@@ -51,41 +51,52 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
     df = df.iloc[:,1:] #get rid of first col that is now index
     target = df.values #(551x16) stim x avg sqrt of spikes
     target = target[:-1,:] #Remove last image from data and target - wasn't shown to more than 3 neurons, no info
-    # (TOGGLE) Dataset with all ims
-    if subset:
-        target = np.concatenate([target[:,:2], target[:,9:]],1)
-        import ipdb; ipdb.set_trace()
-        features = features[50:]
-    else:
-        target = target[:,2:8]
-        features = features[50:200]
-
-    # Load features
+    
+    ## Load features
     features = np.load(os.path.join(data_root, features_name)).item()# load features
 
-    # Split data into different train/val sets
+    # Shuffle indices
     rs = ShuffleSplit(n_splits=5, test_size=0.1)
-    splits = [(train , test) for train, test in rs.split(np.arange(features[0].shape[0]))]
+
+    #(TOGGLE) Dataset with all ims
+    if subset:
+        target = np.concatenate([target[:,:2], target[:,9:]],1)
+        # Split data into different train/val sets
+        splits = [(train , test) for train, test in rs.split(np.arange(features[0][50:200].shape[0]))]
+
+    else:
+        target = target[:,2:8]
+        # Split data into different train/val sets
+        splits = [(train , test) for train, test in rs.split(np.arange(features[0][50:].shape[0]))]
+
 
     # Fit
     perf_r2 = []
     perf_rmse = []
     for layer in features.keys():
+    #(TOGGLE) Dataset with all ims
+        if subset:
+            features[layer] = features[layer][50:200]
+        else:
+            features[layer] = features[layer][50:]
+
         split_r2 = []
         split_rmse = []
         for idx, split in enumerate(splits):
             # print('Split ', idx)
+            train_features = features[layer][split[0]].reshape(features[layer].shape[0], features[layer].shape[1], -1)
+            val_features = features[layer][split[1]].reshape(features[layer].shape[0], features[layer].shape[1], -1)
             if method == 'linear':
-                reg = LinearRegression().fit(features[layer][split[0]], target[split[0]]) # fit for images neurons have seen
-                preds = reg.predict(features[layer][split[1]])
-                r2_score = reg.score(features[layer][split[1]], target[split[1]])
+                reg = LinearRegression().fit(train_features, target[split[0]]) # fit for images neurons have seen
+                preds = reg.predict(val_features)
+                r2_score = reg.score(val_features, target[split[1]])
                 rmse_score = rmse(target[split[1]], preds)
             elif method == 'ridge':
                 # import ipdb; ipdb.set_trace()
                 clf = Ridge(alpha)
-                clf.fit(features[layer][split[0]], target[split[0]])
-                preds = clf.predict(features[layer][split[1]])
-                r2_score = clf.score(features[layer][split[1]], target[split[1]])
+                clf.fit(train_features, target[split[0]])
+                preds = clf.predict(val_features)
+                r2_score = clf.score(val_features, target[split[1]])
                 rmse_score = rmse(target[split[1]], preds)
             # save scores for split
             split_r2.append(r2_score)
@@ -114,8 +125,8 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
 
 if __name__ == '__main__':
     data_root = '/home/jlg/michele/data/uwndc19'#'/Users/minter/Dropbox/uwndc19_data/'
-    get_features(load_data(data_root))
+    # get_features(load_data(data_root))
     # predict(data_root, 'alexnet_features.npy', 'linear', subset=True)
-    # alphas = [1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3]
-    # for alpha in alphas:
-    #   predict(data_root, 'alexnet_features.npy', 'ridge', alpha=alpha)
+    alphas = [1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3]
+    for alpha in alphas:
+        predict(data_root, 'alexnet_features.npy', 'ridge', alpha=alpha)
