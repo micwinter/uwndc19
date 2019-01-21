@@ -117,31 +117,33 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
             ############################################
 
             ########### PER PIXEL ######################
-            # # Regress over all pixels
-            # train_features = features[layer][split[0]].reshape(features[layer][split[0]].shape[0], features[layer][split[0]].shape[1], -1)
-            # val_features = features[layer][split[1]].reshape(features[layer][split[1]].shape[0], features[layer][split[1]].shape[1], -1)
-            #
-            # # scores = []
-            # for i in range(train_features.shape[2]):
-            #     t_feat = train_features[:, :, i]
-            #     v_feat = val_features[:, :, i]
-            #     reg.fit(t_feat, target[split[0]])
-            #     split_scores[idx, i] = reg.score(v_feat, target[split[1]])
+            # Regress over all pixels
+            train_features = features[layer][split[0]].reshape(features[layer][split[0]].shape[0], features[layer][split[0]].shape[1], -1)
+            val_features = features[layer][split[1]].reshape(features[layer][split[1]].shape[0], features[layer][split[1]].shape[1], -1)
+
+            # scores = []
+            for i in range(train_features.shape[2]):
+                t_feat = train_features[:, :, i]
+                v_feat = val_features[:, :, i]
+                reg.fit(t_feat, target[split[0]])
+                split_scores[idx, i] = reg.score(v_feat, target[split[1]])
 
         # Plot scores by layer
-        # plt.plot(split_scores.mean(0), label=str(layer))
-    # plt.plot(split_scores.mean(0), label=str(layer))
-    # plt.legend()
-    # plt.xlabel('Pixel')
-    # plt.ylabel('R2 Score')
-    # x1,x2,y1,y2 = plt.axis()
-    # plt.axis((x1,x2,0,np.max(split_scores.mean(0))))
-    # model = features_name.split('_')[0]
-    # if method == 'ridge':
-    #     plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'_pixelscores.png'))
-    # else:
-    #     plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg_pixelscores.png'))
-    # plt.close()
+        ax = plt.axes()
+        ax.set_color_cycle([plt.cm.cool(clr) for clr in np.linspace(0, 1, len(features.keys()))])
+        plt.plot(split_scores.mean(0), label=str(layer))
+    plt.plot(split_scores.mean(0), label=str(layer))
+    plt.legend()
+    plt.xlabel('Pixel')
+    plt.ylabel('R2 Score')
+    x1,x2,y1,y2 = plt.axis()
+    plt.axis((x1,x2,0,np.max(split_scores.mean(0))))
+    model = features_name.split('_')[0]
+    if method == 'ridge':
+        plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'_pixelscores.png'))
+    else:
+        plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg_pixelscores.png'))
+    plt.close()
             ###########################################
 
             ######## USE PIXEL FOR FLATTENED ##########
@@ -164,59 +166,59 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
             # t_pos = train_features[:,:,scores>0].reshape(train_features.shape[0], train_features.shape[1]*pos_scores.shape[0]) # positive scoring pixels
             # v_pos = val_features[:,:,scores>0].reshape(val_features.shape[0], val_features.shape[1]*pos_scores.shape[0])
 
-            t_pos = features[layer][split[0]].reshape(features[layer][split[0]].shape[0], -1)
-            v_pos = features[layer][split[1]].reshape(features[layer][split[1]].shape[0], -1)
-
-
-            # Train linear model on these pixels
-            reg = Ridge(alpha)
-            reg.fit(t_pos, target[split[0]])
-            preds = reg.predict(v_pos)
-            r2_score = reg.score(v_pos, target[split[1]])
-            rmse_score = rmse(target[split[1]], preds)
-
-            # save scores for split
-            split_r2.append(r2_score)
-            split_rmse.append(rmse_score)
-            # print('R2 Score = ', r2_score)
-            # print('RMSE = ', rmse_score)
-
-        perf_r2.append(np.mean(split_r2))
-        perf_rmse.append(np.mean(split_rmse))
-
-    plt.plot(perf_r2, label='R2 Score')
-    plt.plot(perf_rmse, label='RMSE')
-    plt.axhline(y=0.7308948730140196, color='c', linestyle='--', label='baseline')
-    plt.legend()
-    plt.xlabel('Layers')
-    x1,x2,y1,y2 = plt.axis()
-    plt.axis((x1,x2,-0.1,1))
-    model = features_name.split('_')[0]
-    plt.title(model)
-    if method == 'ridge':
-        plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'_pixelwise_flat.png'))
-    else:
-        plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg_pixelwise.png'))
-    plt.close()
+    #         t_pos = features[layer][split[0]].reshape(features[layer][split[0]].shape[0], -1)
+    #         v_pos = features[layer][split[1]].reshape(features[layer][split[1]].shape[0], -1)
+    #
+    #
+    #         # Train linear model on these pixels
+    #         reg = Ridge(alpha)
+    #         reg.fit(t_pos, target[split[0]])
+    #         preds = reg.predict(v_pos)
+    #         r2_score = reg.score(v_pos, target[split[1]])
+    #         rmse_score = rmse(target[split[1]], preds)
+    #
+    #         # save scores for split
+    #         split_r2.append(r2_score)
+    #         split_rmse.append(rmse_score)
+    #         # print('R2 Score = ', r2_score)
+    #         # print('RMSE = ', rmse_score)
+    #
+    #     perf_r2.append(np.mean(split_r2))
+    #     perf_rmse.append(np.mean(split_rmse))
+    #
+    # plt.plot(perf_r2, label='R2 Score')
+    # plt.plot(perf_rmse, label='RMSE')
+    # plt.axhline(y=0.7308948730140196, color='c', linestyle='--', label='baseline')
+    # plt.legend()
+    # plt.xlabel('Layers')
+    # x1,x2,y1,y2 = plt.axis()
+    # plt.axis((x1,x2,-0.1,1))
+    # model = features_name.split('_')[0]
+    # plt.title(model)
+    # if method == 'ridge':
+    #     plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'_pixelwise_flat.png'))
+    # else:
+    #     plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg_pixelwise.png'))
+    # plt.close()
             ###########################################
 
 
 
 
-    plt.plot(perf_r2, label='R2 Score')
-    plt.plot(perf_rmse, label='RMSE')
-    plt.axhline(y=0.7308948730140196, color='c', linestyle='--', label='baseline')
-    plt.legend()
-    plt.xlabel('Layers')
-    x1,x2,y1,y2 = plt.axis()
-    plt.axis((x1,x2,-0.1,1))
-    model = features_name.split('_')[0]
-    plt.title(model)
-    if method == 'ridge':
-        plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'.png'))
-    else:
-        plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg.png'))
-    plt.close()
+    # plt.plot(perf_r2, label='R2 Score')
+    # plt.plot(perf_rmse, label='RMSE')
+    # plt.axhline(y=0.7308948730140196, color='c', linestyle='--', label='baseline')
+    # plt.legend()
+    # plt.xlabel('Layers')
+    # x1,x2,y1,y2 = plt.axis()
+    # plt.axis((x1,x2,-0.1,1))
+    # model = features_name.split('_')[0]
+    # plt.title(model)
+    # if method == 'ridge':
+    #     plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'.png'))
+    # else:
+    #     plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg.png'))
+    # plt.close()
 
 def submission(data_root, features_name, method, alpha=None, layer=6, t=99):
     # Load Responses
@@ -258,6 +260,6 @@ if __name__ == '__main__':
     # for alpha in alphas:
     #     predict(data_root, 'alexnet_features.npy', 'ridge', alpha=alpha)
 
-    predict(data_root, 'alexnet_features.npy', 'ridge', alpha=1e3, subset=True)
+    predict(data_root, 'vgg16_features.npy', 'ridge', alpha=1e3, subset=True)
 
     # submission(data_root, 'alexnet_features.npy', 'ridge', alpha=1e3, layer=4, t=1)
