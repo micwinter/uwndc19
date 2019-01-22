@@ -59,6 +59,7 @@ class BaseModel:
         tag = random.randint(1000,9999)
 
         print('Root mean squared error', str(np.mean(testrmse)))
+        print('R2 score', str(np.mean(testpredr2)))
 
 
         trainr2= np.array(trainr2)
