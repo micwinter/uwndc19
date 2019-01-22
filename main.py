@@ -321,19 +321,67 @@ def submission(data_root, features_name, method, alpha=None, layer=6, t=99):
     target = target[:-1,:] #Remove last image from data and target - wasn't shown to more than 3 neurons, no info
 
     ## Load features
-    features = np.load(os.path.join(data_root, features_name)).item()# load features
+    net_features = np.load(os.path.join(data_root, features_name)).item()# load features
 
-    # Test features
-    test_features = features[layer][:50].mean(-1).mean(-1) # first 50 images
-    train_features = features[layer][50:].mean(-1).mean(-1)
+    # Load in pixel responses
+    file = '/Users/minter/Dropbox/uwndc19_data/alexnet_ridge_reg_alpha1000.0_pixel_dictionary.npy'
+
+    neuron_act = np.load(file).item()
+
+    neuron_choices = {
+    0: 12,
+    1: 11,
+    2: 10,
+    3: 9,
+    4: 6,
+    5: 8,
+    6: 8,
+    7: 11,
+    8: 6,
+    9: 10,
+    10: 9,
+    11: 7,
+    12: 9,
+    13: 10,
+    14: 8,
+    15: 7,
+    16: 9,
+    17: 5
+    }
 
     # Fit on test images
     preds = np.empty((50,18))
-    for unit in range(target.shape[1]):
-        rec = df.iloc[:-1, unit].dropna()
-        reg = Ridge(alpha)
-        reg.fit(train_features[:len(rec)], rec)
-        preds[:,unit] = reg.predict(test_features)
+    for neuron in range(target.shape[1]):
+
+        l_choice = neuron_choices[neuron]
+
+        # Take images in train dataset
+        features = net_features[l_choice][50:]
+
+        # Get 90% best performing pixels
+        pixels = neuron_act[neuron][l_choice]['R2']
+        max_response = np.max(pixels)
+        top_response = 0.9*max_response
+
+        # Test features
+        test_features = net_features[l_choice][:50]
+        test_features = test_features.reshape(test_features.shape[0],test_features.shape[1],-1)
+        test_features = test_features[:,:,pixels>=top_response]
+        test_features = test_features.reshape(test_features.shape[0], -1)
+        train_features = net_features[l_choice][50:]
+        train_features = train_features.reshape(train_features.shape[0], train_features.shape[1], -1)
+        train_features = train_features[:,:,pixels>=top_response]
+        train_features = train_features.reshape(train_features.shape[0], -1)
+
+        rec = df.iloc[:-1, neuron].dropna()
+        # Train linear model on these pixels
+        # Grid search on alpha
+        parameters = {'alpha':[1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]}
+        reg = Ridge()
+        clf = GridSearchCV(reg, parameters, cv=5)
+        clf.fit(train_features[:len(rec)], rec)
+        print('Neuron: ', neuron, 'layer: ', l_choice, clf.best_params_)
+        preds[:,neuron] = clf.predict(test_features)
 
 
     # Save csv file
@@ -352,6 +400,6 @@ if __name__ == '__main__':
     # for alpha in alphas:
     #     predict(data_root, 'alexnet_features.npy', 'ridge', alpha=alpha)
 
-    predict(data_root, 'alexnet_features.npy', 'ridge', subset=True)
+    # predict(data_root, 'alexnet_features.npy', 'ridge', subset=True)
 
-    # submission(data_root, 'alexnet_features.npy', 'ridge', alpha=1e3, layer=4, t=1)
+    submission(data_root, 'alexnet_features.npy', 'ridge', t=2)
