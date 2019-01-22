@@ -5,7 +5,9 @@ import os
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import Ridge
+from sklearn.linear_model import LassoLarsCV
 from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import GridSearchCV
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 
@@ -202,72 +204,93 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
 
     neuron_act = np.load(file).item()
 
-    for layer in net_features.keys():
-        print('Layer: ', layer)
+    for neuron in range(target.shape[1]):
+        print('Neuron: ', neuron)
 
-        # Take images in train dataset
-        features = net_features[layer][50:]
+        perf_r2 = []
+        perf_rmse = []
 
-        for neuron in range(target.shape[1]):
-            print('Neuron: ', neuron)
+        for layer in net_features.keys():
+            print('Layer: ', layer)
+
+            # Take images in train dataset
+            features = net_features[layer][50:]
+
+            # Split data into different train/val sets
+            curr_target = target[:,neuron]
+            curr_target = curr_target[~np.isnan(curr_target)]
+            splits = [(train , test) for train, test in rs.split(np.arange(curr_target.shape[0]))]
 
             # Get 90% best performing pixels
             pixels = neuron_act[neuron][layer]['R2']
             max_response = np.max(pixels)
-            max_response = 0.9*max_response
-            import ipdb; ipdb.set_trace()
-            pixels = pixels[pixels>=max_response]
+            # if layer == 4:
+            #     import ipdb; ipdb.set_trace()
+            #     print('hi')
 
-            train_features = features[layer][split[0]].reshape(features[layer][split[0]].shape[0], features[layer][split[0]].shape[1], -1)
-            val_features = features[layer][split[1]].reshape(features[layer][split[1]].shape[0], features[layer][split[1]].shape[1], -1)
+            # if Layer is
+            if max_response <= 0:
+                perf_r2.append(0)
+                perf_rmse.append(1)
+                continue
 
-            for i in range(train_features.shape[2]):
-                t_feat = train_features[:, :, i]
-                v_feat = val_features[:, :, i]
-                reg.fit(t_feat, target[split[0]])
-                split_scores[idx, i] = reg.score(v_feat, target[split[1]])
+            top_response = 0.9*max_response
+            # pixels = pixels[pixels>=max_response]
 
-            # Only take pixels with positive r2scores from flattented features
-            scores = split_scores[idx, :]
-            pos_scores = scores[scores>0]
-            t_pos = train_features[:,:,scores>0].reshape(train_features.shape[0], train_features.shape[1]*pos_scores.shape[0]) # positive scoring pixels
-            v_pos = val_features[:,:,scores>0].reshape(val_features.shape[0], val_features.shape[1]*pos_scores.shape[0])
+            split_r2 = []
+            split_rmse = []
 
-            t_pos = features[layer][split[0]].reshape(features[layer][split[0]].shape[0], -1)
-            v_pos = features[layer][split[1]].reshape(features[layer][split[1]].shape[0], -1)
+            for idx, split in enumerate(splits):
+                if method == 'linear':
+                    reg = LinearRegression()
+                elif method == 'ridge':
+                    reg = Ridge(alpha)
+                elif method == 'lasso':
+                    reg = LassoLarsCV()
+                # Regress over all pixels
+                train_features = features[split[0]].reshape(features[split[0]].shape[0], features[split[0]].shape[1], -1)
+                # Select pixels
+                train_features = train_features[:,:,pixels>=top_response]
+                train_features = train_features.reshape(train_features.shape[0], -1)
+                val_features = features[split[1]].reshape(features[split[1]].shape[0], features[split[1]].shape[1], -1)
+                val_features = val_features[:,:,pixels>=top_response]
+                val_features = val_features.reshape(val_features.shape[0], -1)
 
+                # Train linear model on these pixels
+                # Grid search on alpha
+                parameters = {'alpha':[1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]}
+                reg = Ridge()
+                clf = GridSearchCV(reg, parameters, cv=5)
+                clf.fit(train_features, curr_target[split[0]])
+                print('Neuron: ', neuron, 'layer: ', layer, clf.best_params_)
+                preds = clf.predict(val_features)
+                r2_score = clf.score(val_features, curr_target[split[1]])
+                rmse_score = rmse(curr_target[split[1]], preds)
 
-            # Train linear model on these pixels
-            reg = Ridge(alpha)
-            reg.fit(t_pos, target[split[0]])
-            preds = reg.predict(v_pos)
-            r2_score = reg.score(v_pos, target[split[1]])
-            rmse_score = rmse(target[split[1]], preds)
+                # save scores for split
+                split_r2.append(r2_score)
+                split_rmse.append(rmse_score)
+                # print('R2 Score = ', r2_score)
+                # print('RMSE = ', rmse_score)
 
-            # save scores for split
-            split_r2.append(r2_score)
-            split_rmse.append(rmse_score)
-            # print('R2 Score = ', r2_score)
-            # print('RMSE = ', rmse_score)
+            perf_r2.append(np.mean(split_r2))
+            perf_rmse.append(np.mean(split_rmse))
 
-        perf_r2.append(np.mean(split_r2))
-        perf_rmse.append(np.mean(split_rmse))
-
-    plt.plot(perf_r2, label='R2 Score')
-    plt.plot(perf_rmse, label='RMSE')
-    plt.axhline(y=0.7308948730140196, color='c', linestyle='--', label='baseline')
-    plt.axhline(y=0.0414382636021091, color='m', linestyle='--', label='R2 baseline')
-    plt.legend()
-    plt.xlabel('Layers')
-    x1,x2,y1,y2 = plt.axis()
-    plt.axis((x1,x2,-0.1,1))
-    model = features_name.split('_')[0]
-    plt.title(model)
-    if method == 'ridge':
-        plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'_pixelwise_flat.png'))
-    else:
-        plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg_pixelwise.png'))
-    plt.close()
+        plt.plot(perf_r2, label='R2 Score')
+        plt.plot(perf_rmse, label='RMSE')
+        plt.axhline(y=0.7308948730140196, color='c', linestyle='--', label='baseline')
+        plt.axhline(y=0.0414382636021091, color='m', linestyle='--', label='R2 baseline')
+        plt.legend()
+        plt.xlabel('Layers')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((x1,x2,-0.1,1))
+        model = features_name.split('_')[0]
+        plt.title(model+' neuron '+str(neuron))
+        if method == 'ridge':
+            plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'_flat_neuron_'+str(neuron)+'.png'))
+        else:
+            plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg_pixelwise.png'))
+        plt.close()
             ###########################################
 
 
@@ -329,6 +352,6 @@ if __name__ == '__main__':
     # for alpha in alphas:
     #     predict(data_root, 'alexnet_features.npy', 'ridge', alpha=alpha)
 
-    predict(data_root, 'vgg16_features.npy', 'ridge', alpha=1e3, subset=True)
+    predict(data_root, 'alexnet_features.npy', 'ridge', subset=True)
 
     # submission(data_root, 'alexnet_features.npy', 'ridge', alpha=1e3, layer=4, t=1)
