@@ -10,6 +10,7 @@ from sklearn.model_selection import ShuffleSplit
 from sklearn.model_selection import GridSearchCV
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
+from scipy import stats
 
 def rmse(x, y):
     return np.sqrt(np.mean((x-y) ** 2))
@@ -49,7 +50,7 @@ def get_features(data):
     print('Saving file...')
     np.save(os.path.join(data_root, save_name), ext_feat)
 
-def predict(data_root, features_name, method, alpha=None, subset=False):
+def predict(data_root, features_name, method=None, alpha=None):
     # Load Responses
     df = pd.read_csv(os.path.join(data_root, 'train.csv'))
     df.index = df.Id #turn the first col to index
@@ -197,22 +198,115 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
             ###########################################
 
             ######## USE PIXEL FOR FLATTENED ##########
-            # Regress over all pixels
+    #         # Regress over all pixels
+    #
+    # # Load in pixel responses
+    # file = '/Users/minter/Dropbox/uwndc19_data/alexnet_ridge_reg_alpha1000.0_pixel_dictionary.npy'
+    #
+    # neuron_act = np.load(file).item()
+    #
+    # # for neuron in range(target.shape[1]):
+    # for neuron in [14]:
+    #     print('Neuron: ', neuron)
+    #
+    #     perf_r2 = []
+    #     perf_rmse = []
+    #     alphas_ridge = []
+    #     alphas_lasso = []
+    #
+    #     for layer in net_features.keys():
+    #         print('Layer: ', layer)
+    #
+    #         # Take images in train dataset
+    #         features = net_features[layer][50:]
+    #
+    #         # Split data into different train/val sets
+    #         curr_target = target[:,neuron]
+    #         curr_target = curr_target[~np.isnan(curr_target)]
+    #         splits = [(train , test) for train, test in rs.split(np.arange(curr_target.shape[0]))]
+    #
+    #         # Get 90% best performing pixels
+    #         pixels = neuron_act[neuron][layer]['R2']
+    #         max_response = np.max(pixels)
+    #         # if layer == 4:
+    #         #     import ipdb; ipdb.set_trace()
+    #         #     print('hi')
+    #
+    #         # if Layer is
+    #         if max_response <= 0:
+    #             perf_r2.append(0)
+    #             perf_rmse.append(1)
+    #             alphas_ridge.append(-1)
+    #             alphas_lasso.append(-1)
+    #             continue
+    #
+    #         top_response = 0.9*max_response
+    #         # pixels = pixels[pixels>=max_response]
+    #
+    #         split_r2 = []
+    #         split_rmse = []
+    #         split_alphas_ridge = []
+    #         split_alphas_lasso = []
+    #
+    #         for idx, split in enumerate(splits):
+    #             # if method == 'linear':
+    #             #     reg = LinearRegression()
+    #             # elif method == 'ridge':
+    #             #     reg = Ridge(alpha)
+    #             #     # Grid search on alpha
+    #             #     parameters = {'alpha':[1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]}
+    #             #     clf = GridSearchCV(reg, parameters, cv=5)
+    #             # elif method == 'lasso':
+    #             #     clf = LassoLarsCV(cv=5)
+    #             # Regress over all pixels
+    #             train_features = features[split[0]].reshape(features[split[0]].shape[0], features[split[0]].shape[1], -1)
+    #             # Select pixels
+    #             train_features = train_features[:,:,pixels>=top_response]
+    #             train_features = train_features.reshape(train_features.shape[0], -1)
+    #             val_features = features[split[1]].reshape(features[split[1]].shape[0], features[split[1]].shape[1], -1)
+    #             val_features = val_features[:,:,pixels>=top_response]
+    #             val_features = val_features.reshape(val_features.shape[0], -1)
+    #
+    #             # # Train linear model on these pixels
+    #             # reg = Ridge(alpha)
+    #             # # Grid search on alpha
+    #             # parameters = {'alpha':[1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]}
+    #             # clf = GridSearchCV(reg, parameters, cv=5)
+    #             # clf.fit(train_features, curr_target[split[0]])
+    #             # split_alphas_ridge.append(clf.best_params_['alpha'])
+    #
+    #             clf = LassoLarsCV(cv=5)
+    #             clf.fit(train_features, curr_target[split[0]])
+    #             import ipdb; ipdb.set_trace()
+    #             split_alphas_lasso.append(clf.alpha_)
+    #             clf.coef_
+    #
+    #             # clf.fit(train_features, curr_target[split[0]])
+    #             # # print('Neuron: ', neuron, 'layer: ', layer, clf.best_params_)
+    #             # preds = clf.predict(val_features)
+    #             # r2_score = clf.score(val_features, curr_target[split[1]])
+    #             # rmse_score = rmse(curr_target[split[1]], preds)
+    #             #
+    #             # # save scores for split
+    #             # split_r2.append(r2_score)
+    #             # split_rmse.append(rmse_score)
+    #
+    #             # print('R2 Score = ', r2_score)
+    #             # print('RMSE = ', rmse_score)
+    #
+    #         # perf_r2.append(np.mean(split_r2))
+    #         # perf_rmse.append(np.mean(split_rmse))
+    #         alphas_ridge.append(stats.mode(split_alphas_ridge)[0].item())
+    #         alphas_lasso.append(stats.mode(split_alphas_lasso)[0].item())
 
-    # Load in pixel responses
-    file = '/Users/minter/Dropbox/uwndc19_data/alexnet_ridge_reg_alpha1000.0_pixel_dictionary.npy'
-
-    neuron_act = np.load(file).item()
-
+        ###########  LASSO and then RIDGE ###########
     for neuron in range(target.shape[1]):
         print('Neuron: ', neuron)
-
         perf_r2 = []
         perf_rmse = []
 
         for layer in net_features.keys():
             print('Layer: ', layer)
-
             # Take images in train dataset
             features = net_features[layer][50:]
 
@@ -221,48 +315,27 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
             curr_target = curr_target[~np.isnan(curr_target)]
             splits = [(train , test) for train, test in rs.split(np.arange(curr_target.shape[0]))]
 
-            # Get 90% best performing pixels
-            pixels = neuron_act[neuron][layer]['R2']
-            max_response = np.max(pixels)
-            # if layer == 4:
-            #     import ipdb; ipdb.set_trace()
-            #     print('hi')
-
-            # if Layer is
-            if max_response <= 0:
-                perf_r2.append(0)
-                perf_rmse.append(1)
-                continue
-
-            top_response = 0.9*max_response
-            # pixels = pixels[pixels>=max_response]
-
             split_r2 = []
             split_rmse = []
 
             for idx, split in enumerate(splits):
-                if method == 'linear':
-                    reg = LinearRegression()
-                elif method == 'ridge':
-                    reg = Ridge(alpha)
-                elif method == 'lasso':
-                    reg = LassoLarsCV()
-                # Regress over all pixels
-                train_features = features[split[0]].reshape(features[split[0]].shape[0], features[split[0]].shape[1], -1)
-                # Select pixels
-                train_features = train_features[:,:,pixels>=top_response]
-                train_features = train_features.reshape(train_features.shape[0], -1)
-                val_features = features[split[1]].reshape(features[split[1]].shape[0], features[split[1]].shape[1], -1)
-                val_features = val_features[:,:,pixels>=top_response]
-                val_features = val_features.reshape(val_features.shape[0], -1)
+                train_features = features[split[0]].reshape(features[split[0]].shape[0], -1)
+                val_features = features[split[1]].reshape(features[split[1]].shape[0], -1)
+
+                # Fit LASSO
+                reg = LassoLarsCV(cv=5)
+                reg.fit(train_features, curr_target[split[0]])
+
+                # Get features with nonzero coefs
+                train_features = train_features[:,np.where(reg.coef_)[0]]
+                val_features = val_features[:,np.where(reg.coef_)[0]]
 
                 # Train linear model on these pixels
+                reg = Ridge(alpha)
                 # Grid search on alpha
                 parameters = {'alpha':[1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]}
-                reg = Ridge()
                 clf = GridSearchCV(reg, parameters, cv=5)
                 clf.fit(train_features, curr_target[split[0]])
-                print('Neuron: ', neuron, 'layer: ', layer, clf.best_params_)
                 preds = clf.predict(val_features)
                 r2_score = clf.score(val_features, curr_target[split[1]])
                 rmse_score = rmse(curr_target[split[1]], preds)
@@ -270,15 +343,30 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
                 # save scores for split
                 split_r2.append(r2_score)
                 split_rmse.append(rmse_score)
-                # print('R2 Score = ', r2_score)
-                # print('RMSE = ', rmse_score)
+
+                print('R2 Score = ', r2_score)
+                print('RMSE = ', rmse_score)
 
             perf_r2.append(np.mean(split_r2))
             perf_rmse.append(np.mean(split_rmse))
 
+
+        ######## Plot alphas #######################
+        # fig, axs = plt.subplots(2,1)
+        # model = features_name.split('_')[0]
+        # plt.title(model+' neuron '+str(neuron))
+        # axs[0].plot(alphas_ridge, label='ridge')
+        # plt.legend()
+        # axs[1].plot(alphas_lasso, label='lasso')
+        # plt.legend()
+        # plt.xlabel('Layers')
+        # plt.savefig(os.path.join(data_root, 'figures',  model+'_flat_neuron_'+str(neuron)+'_ALPHAS_TRAIN.png'))
+        #
+        # plt.close()
+        ################################################
         plt.plot(perf_r2, label='R2 Score')
         plt.plot(perf_rmse, label='RMSE')
-        plt.axhline(y=0.7308948730140196, color='c', linestyle='--', label='baseline')
+        plt.axhline(y=0.7308948730140196, color='c', linestyle='--', label='RMSE baseline')
         plt.axhline(y=0.0414382636021091, color='m', linestyle='--', label='R2 baseline')
         plt.legend()
         plt.xlabel('Layers')
@@ -286,10 +374,8 @@ def predict(data_root, features_name, method, alpha=None, subset=False):
         plt.axis((x1,x2,-0.1,1))
         model = features_name.split('_')[0]
         plt.title(model+' neuron '+str(neuron))
-        if method == 'ridge':
-            plt.savefig(os.path.join(data_root, 'figures',  model+'_ridge_reg_alpha'+str(alpha)+'_flat_neuron_'+str(neuron)+'.png'))
-        else:
-            plt.savefig(os.path.join(data_root, 'figures', model+'_linear_reg_pixelwise.png'))
+        plt.savefig(os.path.join(data_root, 'figures',  model+'_LASSO_RIDGE_flat_neuron_'+str(neuron)+'.png'))
+
         plt.close()
             ###########################################
 
@@ -328,35 +414,53 @@ def submission(data_root, features_name, method, alpha=None, layer=6, t=99):
 
     neuron_act = np.load(file).item()
 
+    # neuron_choices = {
+    # 0: 12,
+    # 1: 11,
+    # 2: 10,
+    # 3: 9,
+    # 4: 6,
+    # 5: 8,
+    # 6: 8,
+    # 7: 11,
+    # 8: 6,
+    # 9: 10,
+    # 10: 9,
+    # 11: 7,
+    # 12: 9,
+    # 13: 10,
+    # 14: 8,
+    # 15: 7,
+    # 16: 9,
+    # 17: 5
+    # }
     neuron_choices = {
-    0: 12,
-    1: 11,
-    2: 10,
+    0: 6,
+    1: 6,
+    2: 5,
     3: 9,
-    4: 6,
-    5: 8,
-    6: 8,
-    7: 11,
-    8: 6,
-    9: 10,
-    10: 9,
-    11: 7,
-    12: 9,
-    13: 10,
-    14: 8,
+    4: 9,
+    5: 6,
+    6: 4,
+    7: 5,
+    8: 5,
+    9: 7,
+    10: 1,
+    11: 5,
+    12: 6,
+    13: 5,
+    14: 6,
     15: 7,
-    16: 9,
-    17: 5
+    16: 6,
+    17: 6
     }
 
     # Fit on test images
     preds = np.empty((50,18))
+    alphas_ridge = []
+    alphas_lasso = []
     for neuron in range(target.shape[1]):
-
         l_choice = neuron_choices[neuron]
-
-        # Take images in train dataset
-        features = net_features[l_choice][50:]
 
         # Get 90% best performing pixels
         pixels = neuron_act[neuron][l_choice]['R2']
@@ -383,13 +487,37 @@ def submission(data_root, features_name, method, alpha=None, layer=6, t=99):
         print('Neuron: ', neuron, 'layer: ', l_choice, clf.best_params_)
         preds[:,neuron] = clf.predict(test_features)
 
+        # reg = Ridge()
+        # parameters = {'alpha':[1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]}
+        # clf = GridSearchCV(reg, parameters, cv=5)
+        # clf.fit(train_features[:len(rec)], rec)
+        # alphas_ridge.append(clf.best_params_['alpha'])
+        #
+        # clf = LassoLarsCV(cv=5)
+        # clf.fit(train_features[:len(rec)], rec)
+        # alphas_lasso.append(clf.alpha_)
 
-    # Save csv file
-    sdf = pd.DataFrame(preds)
-    sdf.columns = df.columns#replace the columns with the correct cell ids from training data
-    sdf.index.name = 'Id'
-    sdf.to_csv(os.path.join(data_root, 'my_sub_'+str(t)+'.csv'))#save to csv
-    sdf.head()
+    ############ PLOT ALPHAS ##########################
+    # fig, axs = plt.subplots(2,1)
+    # model = features_name.split('_')[0]
+    # plt.title(model+' neuron '+str(neuron))
+    # axs[0].plot(alphas_ridge, label='ridge')
+    # plt.legend()
+    # axs[1].plot(alphas_lasso, label='lasso')
+    # plt.legend()
+    # plt.xlabel('Neurons')
+    #
+    # plt.savefig(os.path.join(data_root, 'figures',  model+'_flat_neuron_'+str(neuron)+'_ALPHAS_TEST.png'))
+    #
+    # plt.close()
+    #####################################################
+
+    # # Save csv file
+    # sdf = pd.DataFrame(preds)
+    # sdf.columns = df.columns#replace the columns with the correct cell ids from training data
+    # sdf.index.name = 'Id'
+    # sdf.to_csv(os.path.join(data_root, 'my_sub_'+str(t)+'.csv'))#save to csv
+    # sdf.head()
 
 if __name__ == '__main__':
     data_root = '/Users/minter/Dropbox/uwndc19_data/'#'/home/jlg/michele/data/uwndc19'#'/Users/minter/Dropbox/uwndc19_data/'
@@ -400,6 +528,6 @@ if __name__ == '__main__':
     # for alpha in alphas:
     #     predict(data_root, 'alexnet_features.npy', 'ridge', alpha=alpha)
 
-    # predict(data_root, 'alexnet_features.npy', 'ridge', subset=True)
+    predict(data_root, 'alexnet_features.npy')
 
-    submission(data_root, 'alexnet_features.npy', 'ridge', t=2)
+    # submission(data_root, 'alexnet_features.npy', 'ridge', t=4)
