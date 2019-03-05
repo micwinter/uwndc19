@@ -41,7 +41,6 @@ def main(
 
     save_root = os.path.join(root, now.strftime('%Y_%m_%d_%H_%M'))
 
-
     cuda = True if torch.cuda.is_available() else False
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
@@ -57,13 +56,14 @@ def main(
 
         # Settings
         input_dim =  64
-        alexnet_layer = layer
+        layer = layer
+        model_name = 'vgg16'
         output_dim = 1
         num_val = data['val_label'].shape[0] # num val in train loop
         num_train = data['train_label'].shape[0]
 
         # Model
-        model = BaseModel(input_dim, alexnet_layer, output_dim)
+        model = BaseModel(input_dim, layer, output_dim)
         loss_function = nn.MSELoss()
         optimizer = optim.Adam(model.parameters())
         model.cuda()
@@ -77,7 +77,8 @@ def main(
 
         # Write settings to file
         file_.write('neuron: %d\n' % (neuron))
-        file_.write('alexnet layer: %d\n' % (alexnet_layer))
+        file_.write('model: %s\n' % (model_name))
+        file_.write('layer: %d\n' % (layer))
         file_.write('num stim: %d\n' % (data['train_stim'].shape[0]+data['val_stim'].shape[0]))
 
         # Train
@@ -187,9 +188,10 @@ def main(
         del valset
         del val_loader
 
-    plt.plot(np.range(0,18),neuron_loss)
+    plt.plot(range(0,18),neuron_loss)
     plt.ylim(0,1.2)
     plt.xlabel('Neuron')
+    plt.xticks(np.arange(0,18, step=1))
     plt.title('Best Performance Per Neuron Layer %d' %(layer))
     plt.savefig(os.path.join(save_root,'all_neurons_perf_l'+str(layer)+'.png'))
     plt.close()
@@ -265,6 +267,7 @@ def load_data(data_root, mode='train', neuron=0):
     label = label[:-1,:] #Remove last image from data and target - wasn't shown to more than 3 neurons, no info
     label = label[:,neuron] # only neuron labels
     label = label[~np.isnan(label)]
+    label = (label - np.mean(label))/np.std(label) # z normalize
 
     # Get only stim neuron has seen
     stim = stim[:label.shape[0],:]
@@ -325,6 +328,7 @@ def predict(group0, group1):
 
     # Model
     model = BaseModel(input_dim, alexnet_layer, output_dim)
+    model = nn.DataParallel(model)
     loss_function = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
     model.cuda()
@@ -382,7 +386,10 @@ def predict(group0, group1):
 
 
 if __name__ == '__main__':
-    main(layer=8)
+    for layer in [5,7,10,12,14,17]:
+        main(layer=layer)    
+
+#main(layer=2) # 2,5,7,10,12,14,17
     #visualize_mask('2019_03_01_15_49', '2019_03_01_15_57', mode='numpy', layer=5, epoch=200, ident='batch32')
     #visualize_mask('/home/jlg/michele/gbox/data/uwndc19/2019_02_28_15_30/best_checkpoint.t7','/home/jlg/michele/gbox/data/uwndc19/2019_02_28_15_44/best_checkpoint.t7')
     #predict('/home/jlg/michele/gbox/data/uwndc19/2019_02_26_15_30/mask_checkpoint_e611.t7','/home/jlg/michele/gbox/data/uwndc19/2019_02_26_15_39/mask_checkpoint_e89.t7')

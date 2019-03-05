@@ -10,15 +10,16 @@ from torch.autograd import Variable
 __all__ = ['baseline', 'BASELINE']
 
 class BaseModel(nn.Module):
-    def __init__(self, input_dim, alexnet_layer, output_dim):
+    def __init__(self, input_dim, layer, output_dim):
         super(BaseModel, self).__init__()
 
-        self.alexnet = models.alexnet(pretrained=True).features[:alexnet_layer]
-        alexnet_out = self.alexnet(torch.rand(1,3,80,80))
-        self.raw_mask = nn.Parameter(torch.ones(output_dim, alexnet_out.shape[-1], alexnet_out.shape[-1]))
+        self.feature_layers = models.vgg16(pretrained=True).features[:layer]
+        #self.feature_layers = models.alexnet(pretrained=True).features[:layer]
+        model_out = self.feature_layers(torch.rand(1,3,80,80))
+        self.raw_mask = nn.Parameter(torch.ones(output_dim, model_out.shape[-1], model_out.shape[-1]))
         self.fcs = nn.ModuleList([])
         for ii in range(output_dim):
-            self.fcs.append(nn.Linear(alexnet_out.shape[-3], 1))
+            self.fcs.append(nn.Linear(model_out.shape[-3], 1))
         self.output_dim = output_dim
         
     def forward(self, x):
@@ -26,7 +27,7 @@ class BaseModel(nn.Module):
         mask = self.raw_mask/self.raw_mask.sum()
         #print('Max %8.2f, min %8.2f of raw_mask' % (torch.max(self.raw_mask), torch.min(self.raw_mask)))
         #print('Max %8.2f, min %8.2f of mask' % (torch.max(mask), torch.min(mask)))
-        x = self.alexnet(x)
+        x = self.feature_layers(x)
         x = (x[:,:, None] * mask).sum(-1).sum(-1)
         all_outputs = torch.zeros(x.shape[0],self.output_dim)
         # Separate output linear layer for each neuron
