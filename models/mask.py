@@ -14,7 +14,6 @@ class BaseModel(nn.Module):
         super(BaseModel, self).__init__()
 
         self.feature_layers = models.vgg16(pretrained=True).features[:layer]
-        #self.feature_layers = models.alexnet(pretrained=True).features[:layer]
         model_out = self.feature_layers(torch.rand(1,3,80,80))
         self.raw_mask = nn.Parameter(torch.ones(output_dim, model_out.shape[-1], model_out.shape[-1]))
         self.fcs = nn.ModuleList([])

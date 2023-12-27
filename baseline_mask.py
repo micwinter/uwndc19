@@ -1,23 +1,24 @@
-import argparse
+"""
+Pytorch model which takes stimulus videos that each neuron saw, pushes
+them through VGG16 to extract features, and then learns a spatial mask
+on those extracted features. The spatial mask is then averaged to a
+single pixel per channel. Finally, linear regression is done to predict
+the spike rate from the vector of feature channels for each neuron.
+*For a group of neurons.
+"""
+
 import os
-import sys
-import shutil
-import subprocess
 import datetime
 import pandas as pd
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.utils as utils
 import torch.optim as optim
-from torch.utils.data import TensorDataset, Dataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader
 
 import numpy as np
-import h5py
 import matplotlib.pyplot as plt
 
-from sklearn.model_selection import ShuffleSplit
 from sklearn.metrics import r2_score
 from models import BaseModel
 
