@@ -220,6 +220,8 @@ def submission(data_root, features_name, method, alpha=None, layer=6, t=99):
 
 if __name__ == '__main__':
     data_root = '/home/jlg/michele/data/uwndc19'
+    
+    get_features(data_root)
 
     predict(data_root, 'alexnet_features.npy')
 
